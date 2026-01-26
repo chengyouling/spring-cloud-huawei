@@ -19,30 +19,41 @@ package com.huaweicloud.servicecomb.discovery.check;
 
 import com.google.common.eventbus.Subscribe;
 import com.huaweicloud.common.event.EventManager;
+
+import org.apache.servicecomb.service.center.client.RegistrationEvents.MicroserviceRegistrationEvent;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.apache.servicecomb.service.center.client.RegistrationEvents.MicroserviceInstanceRegistrationEvent;
 
 public class RegistryHealthIndicator implements HealthIndicator {
 
-    private boolean isSuccess = false;
+  private boolean isSuccess = false;
 
-    private static final String REGISTRATION_NOT_READY = "registration not ready";
+  private static final String REGISTRATION_NOT_READY = "registration not ready";
 
-    public RegistryHealthIndicator() {
-        EventManager.register(this);
+  public RegistryHealthIndicator() {
+    EventManager.register(this);
+  }
+
+  @Override
+  public Health health() {
+    if (isSuccess) {
+      return Health.up().build();
     }
+    return Health.down().withDetail("Error Message", REGISTRATION_NOT_READY).build();
+  }
 
-    @Override
-    public Health health() {
-        if (isSuccess) {
-            return Health.up().build();
-        }
-        return Health.down().withDetail("Error Message", REGISTRATION_NOT_READY).build();
-    }
+  @Subscribe
+  public void registryInstanceListener(MicroserviceInstanceRegistrationEvent event) {
+    this.isSuccess = event.isSuccess();
+  }
 
-    @Subscribe
-    public void registryListener(MicroserviceInstanceRegistrationEvent event) {
-            this.isSuccess = event.isSuccess();
+  @Subscribe
+  public void serviceRegistryListener(MicroserviceRegistrationEvent event) {
+    // Successful service registration does not necessarily mean that the microservice is successfully registered.
+    // However, if service registration fails, the microservice definitely fails to be registered.
+    if (!event.isSuccess()) {
+      this.isSuccess = event.isSuccess();
     }
+  }
 }
